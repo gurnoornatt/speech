@@ -2,6 +2,14 @@
 venv/
 env/
 ENV/
+*.dylib
+*.so
+*.dll
+
+# Large model files and libraries
+**/torch/
+**/llvmlite/
+**/site-packages/
 
 # Python bytecode
 __pycache__/
