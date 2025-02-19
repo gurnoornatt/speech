@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import wave
 import tempfile
+from services.transcription import transcription_service
 
 # Configure logging
 logging.basicConfig(
@@ -64,13 +65,30 @@ class AudioBuffer:
             logger.error(f"Error saving WAV file: {e}")
             raise
 
-    def cleanup(self):
+    async def cleanup(self):
         """Clean up temporary files"""
         try:
             if self.temp_file.exists():
                 self.temp_file.unlink()
         except Exception as e:
             logger.error(f"Error cleaning up temporary file: {e}")
+
+async def process_audio(audio_path: Path) -> Dict:
+    """
+    Process audio file with transcription service
+    
+    Args:
+        audio_path (Path): Path to the audio file
+        
+    Returns:
+        Dict: Transcription result
+    """
+    try:
+        result = await transcription_service.transcribe_audio(audio_path)
+        return result
+    except Exception as e:
+        logger.error(f"Error processing audio: {e}")
+        raise
 
 @app.websocket("/ws/audio")
 async def websocket_endpoint(websocket: WebSocket):
@@ -91,7 +109,15 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.info(f"New WebSocket connection established. Active connections: {len(active_connections)}")
 
         # Send confirmation message
-        await websocket.send_json({"status": "connected", "session_id": audio_buffer.id})
+        await websocket.send_json({
+            "status": "connected", 
+            "session_id": audio_buffer.id,
+            "config": {
+                "sample_rate": 44100,
+                "channels": 1,
+                "sample_width": 2
+            }
+        })
 
         # Receive audio chunks
         while True:
@@ -129,9 +155,24 @@ async def websocket_endpoint(websocket: WebSocket):
             if audio_buffer.chunks:
                 await audio_buffer.save_to_wav()
                 logger.info(f"Audio saved to {audio_buffer.temp_file}")
-            
-            # Clean up temporary files after processing
-            audio_buffer.cleanup()
+                
+                # Process the audio file
+                try:
+                    transcription = await process_audio(audio_buffer.temp_file)
+                    await websocket.send_json({
+                        "status": "transcription_complete",
+                        "result": transcription
+                    })
+                    # Clean up temporary files only after successful processing
+                    await audio_buffer.cleanup()
+                except Exception as e:
+                    logger.error(f"Error processing audio: {e}")
+                    await websocket.send_json({
+                        "status": "error",
+                        "message": "Error processing audio"
+                    })
+                    # Clean up on error as well
+                    await audio_buffer.cleanup()
             
         except Exception as e:
             logger.error(f"Error in cleanup: {e}")
