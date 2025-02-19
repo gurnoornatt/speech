@@ -1,101 +1,348 @@
-import Image from "next/image";
+"use client"
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+import React, { useState, useEffect, useRef } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { ConversationSidebar } from "@/components/conversation-sidebar"
+import { UserNav } from "@/components/user-nav"
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+interface AudioFeedback {
+  message: string
+  isPlaying: boolean
+  isError?: boolean
 }
+
+interface RecordingState {
+  isRecording: boolean
+  mediaRecorder: MediaRecorder | null
+  audioChunks: Blob[]
+  error: string | null
+}
+
+const mockConversations = [
+  {
+    id: "1",
+    date: new Date("2025-01-05"),
+    preview: "Initial consultation and assessment",
+  },
+  {
+    id: "2",
+    date: new Date("2025-01-04"),
+    preview: "Working on pronunciation exercises",
+  },
+  {
+    id: "3",
+    date: new Date("2025-01-03"),
+    preview: "Breathing techniques practice",
+  },
+]
+
+export default function VocalAITherapist() {
+  const [isListening, setIsListening] = useState(false)
+  const [audioFeedback, setAudioFeedback] = useState<AudioFeedback>({ 
+    message: "", 
+    isPlaying: false,
+    isError: false 
+  })
+  const [selectedConversation, setSelectedConversation] = useState<string>()
+  const [recordingState, setRecordingState] = useState<RecordingState>({
+    isRecording: false,
+    mediaRecorder: null,
+    audioChunks: [],
+    error: null
+  })
+
+  const timeSliceMs = 1000 // Collect audio chunks every second
+
+  const handleRecordingError = (error: string) => {
+    setRecordingState(prev => ({ ...prev, error, isRecording: false }))
+    setAudioFeedback({ 
+      message: error, 
+      isPlaying: true,
+      isError: true 
+    })
+    setTimeout(() => {
+      setAudioFeedback({ message: "", isPlaying: false, isError: false })
+    }, 3000)
+  }
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      const audioChunks: Blob[] = []
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunks.push(event.data)
+          // Here we'll process the audio chunk in real-time
+          processAudioChunk(event.data)
+        }
+      }
+
+      mediaRecorder.onerror = (event) => {
+        handleRecordingError("Recording failed. Please try again.")
+        stopRecording()
+      }
+
+      mediaRecorder.onstop = () => {
+        if (audioChunks.length === 0) {
+          handleRecordingError("No audio data recorded. Please try again.")
+          return
+        }
+
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' })
+        processCompleteRecording(audioBlob)
+      }
+
+      // Start recording with timeslice for regular ondataavailable events
+      mediaRecorder.start(timeSliceMs)
+      
+      setRecordingState({
+        isRecording: true,
+        mediaRecorder,
+        audioChunks,
+        error: null
+      })
+      setAudioFeedback({ 
+        message: "I'm listening...", 
+        isPlaying: true,
+        isError: false 
+      })
+
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        handleRecordingError("Microphone access denied. Please enable microphone access.")
+      } else if (error instanceof DOMException && error.name === 'NotFoundError') {
+        handleRecordingError("No microphone found. Please connect a microphone.")
+      } else {
+        handleRecordingError("Failed to start recording. Please try again.")
+        console.error('Recording error:', error)
+      }
+    }
+  }
+
+  const processAudioChunk = async (chunk: Blob) => {
+    try {
+      // Here we'll add real-time processing logic
+      // For now, just log the chunk size
+      console.log('Processing audio chunk:', chunk.size)
+    } catch (error) {
+      console.error('Error processing audio chunk:', error)
+    }
+  }
+
+  const processCompleteRecording = async (audioBlob: Blob) => {
+    try {
+      // Here we'll add complete recording processing logic
+      console.log('Processing complete recording:', audioBlob.size)
+    } catch (error) {
+      handleRecordingError("Failed to process recording. Please try again.")
+      console.error('Error processing recording:', error)
+    }
+  }
+
+  const stopRecording = () => {
+    if (recordingState.mediaRecorder && recordingState.isRecording) {
+      try {
+        recordingState.mediaRecorder.stop()
+        recordingState.mediaRecorder.stream.getTracks().forEach(track => track.stop())
+        setRecordingState(prev => ({ 
+          ...prev, 
+          isRecording: false,
+          error: null 
+        }))
+        simulateResponse()
+      } catch (error) {
+        handleRecordingError("Failed to stop recording. Please refresh the page.")
+        console.error('Error stopping recording:', error)
+      }
+    }
+  }
+
+  const handleOrbClick = async () => {
+    if (!recordingState.isRecording) {
+      await startRecording()
+    } else {
+      stopRecording()
+    }
+  }
+
+  const simulateResponse = () => {
+    setTimeout(() => {
+      const responses = [
+        "Your pronunciation is getting clearer!",
+        "Let's focus on your breathing rhythm.",
+        "Great progress on controlling your speed.",
+        "I notice improvement in your confidence.",
+      ]
+      const response = responses[Math.floor(Math.random() * responses.length)]
+      setAudioFeedback({ message: response, isPlaying: true })
+
+      setTimeout(() => {
+        setAudioFeedback({ message: "", isPlaying: false })
+        setIsListening(false)
+      }, 3000)
+    }, 3000)
+  }
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingState.mediaRecorder && recordingState.isRecording) {
+        recordingState.mediaRecorder.stop()
+        recordingState.mediaRecorder.stream.getTracks().forEach(track => track.stop())
+      }
+    }
+  }, [recordingState.mediaRecorder, recordingState.isRecording])
+
+  return (
+    <SidebarProvider defaultOpen={false}>
+      <div className="flex h-screen w-full bg-black">
+        <ConversationSidebar
+          conversations={mockConversations}
+          onSelect={setSelectedConversation}
+          selectedId={selectedConversation}
+        />
+        <div className="flex-1 flex flex-col w-full">
+          <header className="h-14 border-b border-zinc-800 flex items-center justify-between px-4 bg-black">
+            <div className="flex items-center gap-3">
+              <SidebarTrigger />
+              <div className="flex items-center gap-2">
+                <span className="text-xl text-zinc-100">Vocal</span>
+              </div>
+            </div>
+            <UserNav />
+          </header>
+          <main className="flex-1 bg-black flex items-center justify-center relative overflow-hidden w-full">
+            {/* Audio Feedback Indicator */}
+            <AnimatePresence>
+              {audioFeedback.isPlaying && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className={`absolute top-20 text-center text-lg mb-4 ${
+                    audioFeedback.isError ? 'text-red-400' : 'text-zinc-100'
+                  }`}
+                >
+                  {audioFeedback.message}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Interactive Orb */}
+            <motion.div
+              className="relative w-[300px] h-[300px]"
+              animate={{
+                y: [0, -10, 0],
+              }}
+              transition={{
+                duration: 4,
+                repeat: Number.POSITIVE_INFINITY,
+                ease: "easeInOut",
+              }}
+            >
+              <motion.button
+                onClick={handleOrbClick}
+                className="relative group cursor-pointer w-full h-full"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                {/* Base glow */}
+                <motion.div
+                  className="absolute inset-0 rounded-full opacity-30 blur-2xl"
+                  animate={{
+                    opacity: isListening ? [0.2, 0.4, 0.2] : [0.1, 0.2, 0.1],
+                  }}
+                  transition={{
+                    duration: 3,
+                    repeat: Number.POSITIVE_INFINITY,
+                    repeatType: "reverse",
+                  }}
+                  style={{
+                    background:
+                      "radial-gradient(circle, rgba(255,255,255,0.2) 0%, rgba(186,230,253,0.2) 50%, rgba(147,197,253,0.2) 100%)",
+                  }}
+                />
+
+                {/* Main orb */}
+                <motion.div
+                  className="absolute inset-0 rounded-full overflow-hidden backdrop-blur-sm"
+                  animate={{
+                    rotate: 360,
+                  }}
+                  transition={{
+                    duration: 20,
+                    repeat: Number.POSITIVE_INFINITY,
+                    ease: "linear",
+                  }}
+                  style={{
+                    background: `
+                      radial-gradient(circle at 30% 30%, 
+                        rgba(255, 255, 255, 0.9) 0%,
+                        rgba(186, 230, 253, 0.8) 20%,
+                        rgba(147, 197, 253, 0.7) 40%,
+                        rgba(249, 168, 212, 0.6) 60%,
+                        rgba(96, 165, 250, 0.7) 80%
+                      ),
+                      radial-gradient(circle at 70% 70%, 
+                        rgba(96, 165, 250, 0.8) 0%,
+                        rgba(249, 168, 212, 0.7) 30%,
+                        rgba(186, 230, 253, 0.8) 50%,
+                        rgba(147, 197, 253, 0.7) 70%
+                      )
+                    `,
+                    boxShadow: `
+                      inset 0 0 50px rgba(255, 255, 255, 0.3),
+                      inset 0 0 30px rgba(186, 230, 253, 0.3),
+                      0 0 30px rgba(147, 197, 253, 0.2)
+                    `,
+                  }}
+                >
+                  {/* Spots effect */}
+                  <motion.div
+                    className="absolute inset-0"
+                    animate={{
+                      rotate: -360,
+                    }}
+                    transition={{
+                      duration: 25,
+                      repeat: Number.POSITIVE_INFINITY,
+                      ease: "linear",
+                    }}
+                    style={{
+                      background: `
+                        radial-gradient(circle at 20% 20%, rgba(96, 165, 250, 0.7) 0%, transparent 20%),
+                        radial-gradient(circle at 80% 80%, rgba(96, 165, 250, 0.7) 0%, transparent 20%),
+                        radial-gradient(circle at 50% 50%, rgba(249, 168, 212, 0.5) 0%, transparent 30%),
+                        radial-gradient(circle at 80% 20%, rgba(186, 230, 253, 0.6) 0%, transparent 20%),
+                        radial-gradient(circle at 20% 80%, rgba(186, 230, 253, 0.6) 0%, transparent 20%)
+                      `,
+                    }}
+                  />
+
+                  {/* Glass effect overlay */}
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background: `
+                        linear-gradient(
+                          135deg,
+                          rgba(255, 255, 255, 0.2) 0%,
+                          rgba(255, 255, 255, 0.1) 40%,
+                          rgba(255, 255, 255, 0) 100%
+                        )
+                      `,
+                    }}
+                  />
+                </motion.div>
+              </motion.button>
+            </motion.div>
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  )
+}
+

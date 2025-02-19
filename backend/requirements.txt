@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-multipart
+websockets
+pydub
+librosa
+numpy
+openai-whisper
+nltk
+spacy 
