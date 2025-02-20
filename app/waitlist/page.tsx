@@ -43,7 +43,7 @@ export default function WaitlistPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-xl bg-black rounded-3xl border border-zinc-800 p-8 relative"
+        className="w-full max-w-xl bg-black p-8 relative"
       >
         {/* Close button */}
         <button 
@@ -54,13 +54,13 @@ export default function WaitlistPage() {
         </button>
 
         {/* Logo */}
-        <div className="flex justify-center mb-6">
-          <div className="w-24 h-24 relative">
+        <div className="flex justify-center mb-8">
+          <div className="w-20 h-20 relative">
             <Image
               src="/vocal-logo.png"
               alt="Vocal Logo"
-              width={96}
-              height={96}
+              width={80}
+              height={80}
               className="object-contain"
               priority
             />
@@ -69,12 +69,9 @@ export default function WaitlistPage() {
 
         {/* Content */}
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-semibold text-white mb-3">Vocal</h2>
-          <p className="text-zinc-400 text-sm leading-relaxed max-w-lg mx-auto mb-2">
-            Struggling with speech clarity, stutters, or confidence in public speaking? Imagine having a personal speech therapist available 24/7, powered by AI to tailor every session just for you. That's Vocal—our groundbreaking AI speech coach designed to help kids with delays, adults refining their voice, and anyone in between. It's affordable, private, and adapts to your progress in real-time.
-          </p>
-          <p className="text-blue-400 text-sm font-semibold">
-            Refer friends to move up the waitlist! 🚀
+          <h2 className="text-3xl font-semibold text-white mb-3">Unlock Your Voice with <span className="text-blue-600">Vocal</span>: AI-Powered Speech Therapy, Anytime, Anywhere</h2>
+          <p className="text-blue-400 text-sm font-semibold mt-4">
+            Refer friends to move up the waitlist - Top 100 get free premium! 🚀
           </p>
         </div>
 
@@ -94,7 +91,7 @@ export default function WaitlistPage() {
               disabled={isSubmitting}
               className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Subscribing...' : 'Subscribe'}
+              {isSubmitting ? 'Processing...' : 'Get Early Access'}
             </button>
           </div>
           
