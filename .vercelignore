@@ -1,0 +1,31 @@
+# Exclude backend
+backend/
+docs/
+
+# Exclude test files
+**/*.test.*
+**/*.spec.*
+tests/
+
+# Exclude development files
+.env
+.env.*
+!.env.example
+
+# Exclude git files
+.git/
+.gitignore
+
+# Exclude unnecessary app pages
+app/*
+!app/waitlist/
+!app/layout.*
+!app/globals.css
+
+# Exclude documentation
+*.md
+!README.md
+
+# Exclude development configs
+jest.config.*
+tsconfig.tsbuildinfo 
