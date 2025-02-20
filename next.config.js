@@ -5,7 +5,7 @@ const nextConfig = {
   images: {
     domains: ['hebbkx1anhila5yf.public.blob.vercel-storage.com'],
   },
-  // Ensure proper routing
+  // Only redirect root to waitlist
   async rewrites() {
     return [
       {

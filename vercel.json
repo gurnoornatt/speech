@@ -6,7 +6,11 @@
   "installCommand": "npm install",
   "regions": ["sfo1"],
   "rewrites": [
-    { "source": "/:path*", "destination": "/waitlist" }
+    { "source": "/", "destination": "/waitlist" }
+  ],
+  "routes": [
+    { "src": "/favicon.ico", "dest": "/favicon.ico" },
+    { "src": "/static/(.*)", "dest": "/static/$1" }
   ],
   "github": {
     "silent": true
