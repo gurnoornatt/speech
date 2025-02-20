@@ -54,10 +54,15 @@ export default function WaitlistPage() {
 
         {/* Logo */}
         <div className="flex justify-center mb-6">
-          <div className="w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M16 4C9.37 4 4 9.37 4 16C4 22.63 9.37 28 16 28C22.63 28 28 22.63 28 16C28 9.37 22.63 4 16 4ZM20.5 17.5L14.5 21.5C14.3 21.65 14.15 21.7 14 21.7C13.85 21.7 13.7 21.65 13.5 21.5C13.2 21.3 13 21 13 20.6V12.4C13 12 13.2 11.7 13.5 11.5C13.8 11.3 14.2 11.3 14.5 11.5L20.5 15.5C20.8 15.7 21 16 21 16.5C21 17 20.8 17.3 20.5 17.5Z" fill="white"/>
-            </svg>
+          <div className="w-24 h-24 relative">
+            <Image
+              src="/vocal-logo.png"
+              alt="Vocal Logo"
+              width={96}
+              height={96}
+              className="object-contain"
+              priority
+            />
           </div>
         </div>
 
