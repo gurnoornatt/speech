@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import Image from 'next/image'
+import Link from 'next/link'
 
 export default function WaitlistPage() {
   const [email, setEmail] = useState('')
@@ -109,13 +110,13 @@ export default function WaitlistPage() {
         {/* Terms */}
         <p className="text-zinc-500 text-xs text-center mt-8">
           By subscribing, you agree to our{' '}
-          <a href="/terms" className="text-zinc-400 hover:text-white underline">
+          <Link href="/terms" className="text-zinc-400 hover:text-white underline">
             Terms of Service
-          </a>{' '}
+          </Link>{' '}
           and{' '}
-          <a href="/privacy" className="text-zinc-400 hover:text-white underline">
+          <Link href="/privacy" className="text-zinc-400 hover:text-white underline">
             Privacy Policy
-          </a>
+          </Link>
         </p>
       </motion.div>
     </div>
