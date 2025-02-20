@@ -9,6 +9,8 @@
     { "source": "/", "destination": "/waitlist" }
   ],
   "routes": [
+    { "src": "/terms", "dest": "/terms" },
+    { "src": "/privacy", "dest": "/privacy" },
     { "src": "/favicon.ico", "dest": "/favicon.ico" },
     { "src": "/static/(.*)", "dest": "/static/$1" }
   ],
