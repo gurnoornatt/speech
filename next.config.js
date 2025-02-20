@@ -16,4 +16,6 @@ const nextConfig = {
   },
   // Output as standalone
   output: 'standalone',
-} 
+}
+
+module.exports = nextConfig 

@@ -1,10 +1,12 @@
 {
   "version": 2,
   "public": true,
+  "framework": "nextjs",
   "buildCommand": "next build",
-  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "regions": ["sfo1"],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/waitlist" }
+    { "source": "/:path*", "destination": "/waitlist" }
   ],
   "github": {
     "silent": true
