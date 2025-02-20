@@ -64,7 +64,12 @@ export default function WaitlistPage() {
         {/* Content */}
         <div className="text-center mb-8">
           <h2 className="text-2xl font-semibold text-white mb-3">Vocal</h2>
-          <p className="text-zinc-400 text-lg">Unlock your superpower—your portable AI vocal coach.</p>
+          <p className="text-zinc-400 text-sm leading-relaxed max-w-lg mx-auto mb-2">
+            Struggling with speech clarity, stutters, or confidence in public speaking? Imagine having a personal speech therapist available 24/7, powered by AI to tailor every session just for you. That's Vocal—our groundbreaking AI speech coach designed to help kids with delays, adults refining their voice, and anyone in between. It's affordable, private, and adapts to your progress in real-time.
+          </p>
+          <p className="text-blue-400 text-sm font-semibold">
+            Refer friends to move up the waitlist! 🚀
+          </p>
         </div>
 
         {/* Form */}
