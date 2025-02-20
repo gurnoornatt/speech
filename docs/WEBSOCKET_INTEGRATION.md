@@ -91,7 +91,7 @@ export const useWebSocket = (options: WebSocketHookOptions = {}) => {
   return { isConnected, sessionId, disconnect };
 };
 ```
-
+hi
 ## Audio Capture and Streaming
 
 ### Audio Configuration
