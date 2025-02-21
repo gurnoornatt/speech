@@ -15,6 +15,15 @@ export default function WaitlistPage() {
     e.preventDefault()
     setIsSubmitting(true)
     setError('')
+    setSuccess(false)
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address')
+      setIsSubmitting(false)
+      return
+    }
 
     try {
       const response = await fetch('/api/subscribe', {
@@ -22,17 +31,24 @@ export default function WaitlistPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: email.trim() }),
       });
 
       const data = await response.json();
 
-      if (!response.ok) throw new Error(data.error || 'Failed to subscribe');
+      if (!response.ok) {
+        setError(data.error || 'Failed to subscribe');
+        if (data.details) {
+          console.error('Subscription error details:', data.details);
+        }
+        return;
+      }
 
       setSuccess(true)
       setEmail('')
     } catch (err) {
-      setError('Something went wrong. Please try again.')
+      console.error('Subscription error:', err);
+      setError('Unable to connect to the server. Please try again later.')
     } finally {
       setIsSubmitting(false)
     }
