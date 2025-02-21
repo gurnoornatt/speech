@@ -25,27 +25,70 @@ export async function POST(request: Request) {
       );
     }
 
-    // Add to Supabase
-    const { error: dbError } = await supabase
+    // First check if we can access the table
+    const { data: checkData, error: checkError } = await supabase
       .from('waitlist')
-      .insert([{ email, signed_up_at: new Date() }]);
+      .select('count(*)');
 
-    if (dbError) {
-      console.error('Database error:', dbError);
-      // Check if it's a duplicate email error
-      if (dbError.code === '23505') {
-        return new Response(
-          JSON.stringify({ error: 'This email is already on the waitlist!' }),
-          {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' },
-          }
-        );
-      }
+    if (checkError) {
+      console.error('Table access check error:', checkError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Database access error',
+          details: checkError.message 
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Check if email already exists
+    const { data: existingData, error: existingError } = await supabase
+      .from('waitlist')
+      .select('email')
+      .eq('email', email.toLowerCase().trim())
+      .maybeSingle();
+
+    if (existingError) {
+      console.error('Email check error:', existingError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to check email',
+          details: existingError.message 
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    if (existingData) {
+      return new Response(
+        JSON.stringify({ error: 'This email is already on the waitlist!' }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Add to Supabase with explicit schema
+    const { error: insertError } = await supabase
+      .from('waitlist')
+      .insert([{ 
+        email: email.toLowerCase().trim(),
+        signed_up_at: new Date().toISOString()
+      }]);
+
+    if (insertError) {
+      console.error('Insert error:', insertError);
       return new Response(
         JSON.stringify({ 
           error: 'Failed to add email to waitlist',
-          details: dbError.message 
+          details: insertError.message 
         }),
         {
           status: 500,
