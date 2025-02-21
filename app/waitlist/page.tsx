@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { motion } from 'framer-motion'
-import { X } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 
@@ -45,14 +44,6 @@ export default function WaitlistPage() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-xl bg-black p-8 relative"
       >
-        {/* Close button */}
-        <button 
-          className="absolute right-4 top-4 text-zinc-400 hover:text-zinc-300 transition-colors"
-          onClick={() => window.close()}
-        >
-          <X className="h-6 w-6" />
-        </button>
-
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <div className="w-20 h-20 relative">
