@@ -7,35 +7,7 @@ const supabase = createClient(
 
 export async function GET(request: Request) {
   try {
-    // First check if the waitlist table exists
-    const { data: tableExists, error: tableCheckError } = await supabase
-      .from('information_schema.tables')
-      .select('table_name')
-      .eq('table_schema', 'public')
-      .eq('table_name', 'waitlist')
-      .single();
-
-    if (tableCheckError) {
-      return new Response(
-        JSON.stringify({
-          error: 'Error checking table existence',
-          details: tableCheckError,
-          supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL
-        }),
-        {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    // Get all public tables
-    const { data: tables, error: tablesError } = await supabase
-      .from('information_schema.tables')
-      .select('table_name')
-      .eq('table_schema', 'public');
-
-    // Try to get waitlist data with error details
+    // Try to get waitlist data directly
     const { data: subscribers, error: subscribersError } = await supabase
       .from('waitlist')
       .select('*');
@@ -45,9 +17,12 @@ export async function GET(request: Request) {
       .from('waitlist_access')
       .select('*');
 
+    // Get table list using RPC (stored procedure)
+    const { data: tables, error: tablesError } = await supabase
+      .rpc('get_tables');
+
     return new Response(
       JSON.stringify({
-        tableExists,
         tables,
         tablesError,
         subscribers,
@@ -55,6 +30,12 @@ export async function GET(request: Request) {
         accessList,
         accessError,
         supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        // Include raw error messages for debugging
+        errors: {
+          subscribers: subscribersError?.message,
+          access: accessError?.message,
+          tables: tablesError?.message
+        }
       }),
       {
         status: 200,
