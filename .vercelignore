@@ -16,12 +16,6 @@ tests/
 .git/
 .gitignore
 
-# Exclude unnecessary app pages
-app/*
-!app/waitlist/
-!app/layout.*
-!app/globals.css
-
 # Exclude documentation
 *.md
 !README.md
