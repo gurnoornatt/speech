@@ -1,6 +1,14 @@
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
 
+if (!process.env.RESEND_API_KEY) {
+  throw new Error('RESEND_API_KEY is not defined in environment variables');
+}
+
+if (!process.env.ADMIN_API_KEY) {
+  throw new Error('ADMIN_API_KEY is not defined in environment variables');
+}
+
 const resend = new Resend(process.env.RESEND_API_KEY);
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

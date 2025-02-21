@@ -1,6 +1,10 @@
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
 
+if (!process.env.RESEND_API_KEY) {
+  throw new Error('RESEND_API_KEY is not defined in environment variables');
+}
+
 const resend = new Resend(process.env.RESEND_API_KEY);
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,6 +14,23 @@ const supabase = createClient(
 export async function POST(request: Request) {
   try {
     const { email } = await request.json();
+
+    // Check if email already exists
+    const { data: existingEmail } = await supabase
+      .from('waitlist')
+      .select('email')
+      .eq('email', email)
+      .single();
+
+    if (existingEmail) {
+      return new Response(
+        JSON.stringify({ error: 'This email is already on the waitlist!' }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     // Add to Supabase
     const { error: dbError } = await supabase
