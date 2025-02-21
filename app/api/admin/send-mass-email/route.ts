@@ -5,8 +5,8 @@ if (!process.env.RESEND_API_KEY) {
   throw new Error('RESEND_API_KEY is not defined in environment variables');
 }
 
-if (!process.env.ADMIN_API_KEY) {
-  throw new Error('ADMIN_API_KEY is not defined in environment variables');
+if (!process.env.NEXT_PUBLIC_ADMIN_KEY) {
+  throw new Error('NEXT_PUBLIC_ADMIN_KEY is not defined in environment variables');
 }
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -17,7 +17,7 @@ const supabase = createClient(
 
 // Simple API key validation
 const validateApiKey = (apiKey: string) => {
-  return apiKey === process.env.ADMIN_API_KEY;
+  return apiKey === process.env.NEXT_PUBLIC_ADMIN_KEY;
 };
 
 export async function POST(request: Request) {
@@ -32,13 +32,35 @@ export async function POST(request: Request) {
       });
     }
 
+    console.log('Fetching subscribers from Supabase...');
+    
     // Get all waitlist emails
     const { data: subscribers, error: fetchError } = await supabase
       .from('waitlist')
-      .select('email')
+      .select('email, signed_up_at')
       .order('signed_up_at', { ascending: true });
 
-    if (fetchError) throw fetchError;
+    if (fetchError) {
+      console.error('Error fetching subscribers:', fetchError);
+      throw fetchError;
+    }
+
+    if (!subscribers || subscribers.length === 0) {
+      console.log('No subscribers found in the database');
+      return new Response(
+        JSON.stringify({ 
+          error: 'No subscribers found in the database',
+          supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+          queryResult: subscribers 
+        }),
+        {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    console.log(`Found ${subscribers.length} subscribers`);
 
     // Send emails in batches of 50
     const batchSize = 50;
@@ -49,27 +71,41 @@ export async function POST(request: Request) {
       batches.push(emails.slice(i, i + batchSize));
     }
 
+    console.log(`Sending emails in ${batches.length} batches`);
+
     // Process each batch
+    let successfulSends = 0;
     for (const batch of batches) {
-      await Promise.all(
-        batch.map(email =>
-          resend.emails.send({
-            from: 'Vocal <hello@vocalwaitlist.com>',
-            to: email,
-            subject,
-            html,
+      try {
+        await Promise.all(
+          batch.map(async (email) => {
+            try {
+              await resend.emails.send({
+                from: 'Vocal <hello@vocalwaitlist.com>',
+                to: email,
+                subject,
+                html,
+              });
+              successfulSends++;
+            } catch (emailError) {
+              console.error(`Failed to send email to ${email}:`, emailError);
+            }
           })
-        )
-      );
-      
-      // Wait 1 second between batches to avoid rate limits
-      await new Promise(resolve => setTimeout(resolve, 1000));
+        );
+        
+        // Wait 1 second between batches to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (batchError) {
+        console.error('Error processing batch:', batchError);
+      }
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        emailsSent: emails.length 
+        emailsSent: successfulSends,
+        totalSubscribers: subscribers.length,
+        subscriberEmails: emails // Include this temporarily for debugging
       }),
       {
         status: 200,
@@ -80,7 +116,10 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Mass email error:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to send mass email' }),
+      JSON.stringify({ 
+        error: 'Failed to send mass email',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      }),
       {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
