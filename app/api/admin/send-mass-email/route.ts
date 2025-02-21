@@ -20,6 +20,38 @@ const validateApiKey = (apiKey: string) => {
   return apiKey === process.env.NEXT_PUBLIC_ADMIN_KEY;
 };
 
+// Sleep function for delays
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Retry function with exponential backoff
+async function retryWithBackoff<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: any;
+  
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      
+      // If it's not a rate limit error, throw immediately
+      if (error?.statusCode !== 429) {
+        throw error;
+      }
+      
+      // Calculate delay with exponential backoff
+      const delay = baseDelay * Math.pow(2, i);
+      console.log(`Rate limit hit, retrying in ${delay}ms...`);
+      await sleep(delay);
+    }
+  }
+  
+  throw lastError;
+}
+
 export async function POST(request: Request) {
   try {
     const { subject, html, apiKey } = await request.json();
@@ -62,8 +94,8 @@ export async function POST(request: Request) {
 
     console.log(`Found ${subscribers.length} subscribers`);
 
-    // Send emails in batches of 50
-    const batchSize = 50;
+    // Send emails in smaller batches with longer delays
+    const batchSize = 10; // Reduced from 50 to 10
     const emails = subscribers.map(s => s.email);
     const batches = [];
 
@@ -75,28 +107,42 @@ export async function POST(request: Request) {
 
     // Process each batch
     let successfulSends = 0;
-    for (const batch of batches) {
-      try {
-        await Promise.all(
-          batch.map(async (email) => {
-            try {
-              await resend.emails.send({
-                from: 'Vocal <hello@vocalwaitlist.com>',
-                to: email,
-                subject,
-                html,
-              });
-              successfulSends++;
-            } catch (emailError) {
-              console.error(`Failed to send email to ${email}:`, emailError);
-            }
-          })
-        );
-        
-        // Wait 1 second between batches to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (batchError) {
-        console.error('Error processing batch:', batchError);
+    let failedEmails: { email: string; error: string }[] = [];
+
+    for (const [batchIndex, batch] of batches.entries()) {
+      console.log(`Processing batch ${batchIndex + 1}/${batches.length}`);
+      
+      // Process each email in the batch with a delay between each
+      for (const email of batch) {
+        try {
+          await retryWithBackoff(async () => {
+            await resend.emails.send({
+              from: 'Vocal <hello@vocalwaitlist.com>',
+              to: email,
+              subject,
+              html,
+            });
+          });
+          
+          successfulSends++;
+          console.log(`Successfully sent to ${email}`);
+          
+          // Wait 500ms between each email (2 emails per second as per rate limit)
+          await sleep(500);
+          
+        } catch (emailError: any) {
+          console.error(`Failed to send email to ${email}:`, emailError);
+          failedEmails.push({ 
+            email, 
+            error: emailError?.message || 'Unknown error' 
+          });
+        }
+      }
+      
+      // Wait 2 seconds between batches
+      if (batchIndex < batches.length - 1) {
+        console.log('Waiting between batches...');
+        await sleep(2000);
       }
     }
 
@@ -105,7 +151,8 @@ export async function POST(request: Request) {
         success: true, 
         emailsSent: successfulSends,
         totalSubscribers: subscribers.length,
-        subscriberEmails: emails // Include this temporarily for debugging
+        failedEmails,
+        batchesProcessed: batches.length
       }),
       {
         status: 200,
