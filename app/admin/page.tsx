@@ -3,6 +3,11 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 
+interface FailedEmail {
+  email: string;
+  error: string;
+}
+
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [adminKey, setAdminKey] = useState('')
@@ -10,6 +15,11 @@ export default function AdminPage() {
   const [emailContent, setEmailContent] = useState('')
   const [status, setStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [progress, setProgress] = useState({
+    current: 0,
+    total: 0,
+    failedEmails: [] as FailedEmail[]
+  })
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
@@ -20,6 +30,7 @@ export default function AdminPage() {
     e.preventDefault()
     setIsLoading(true)
     setStatus('')
+    setProgress({ current: 0, total: 0, failedEmails: [] })
 
     try {
       const response = await fetch('/api/admin/send-mass-email', {
@@ -38,11 +49,56 @@ export default function AdminPage() {
 
       if (!response.ok) throw new Error(data.error)
 
-      setStatus(`Success! Sent to ${data.emailsSent} subscribers.`)
-      setSubject('')
-      setEmailContent('')
+      setProgress({
+        current: data.emailsSent,
+        total: data.totalSubscribers,
+        failedEmails: data.failedEmails || []
+      })
+
+      setStatus(`Success! Sent ${data.emailsSent} out of ${data.totalSubscribers} emails.`)
+      
+      if (data.failedEmails?.length > 0) {
+        setStatus(prev => `${prev} Failed to send to ${data.failedEmails.length} emails.`)
+      }
     } catch (error) {
       setStatus(`Error: ${error instanceof Error ? error.message : 'Failed to send emails'}`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleRetryFailed = async () => {
+    if (!progress.failedEmails.length) return;
+    
+    setIsLoading(true)
+    setStatus('Retrying failed emails...')
+
+    try {
+      const response = await fetch('/api/admin/retry-failed-emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subject,
+          html: emailContent,
+          apiKey: adminKey,
+          emails: progress.failedEmails.map(f => f.email)
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) throw new Error(data.error)
+
+      setProgress(prev => ({
+        ...prev,
+        failedEmails: data.remainingFailures || []
+      }))
+
+      setStatus(`Retry complete! Successfully sent to ${data.successfulRetries} previously failed emails.`)
+    } catch (error) {
+      setStatus(`Retry error: ${error instanceof Error ? error.message : 'Failed to retry emails'}`)
     } finally {
       setIsLoading(false)
     }
@@ -118,6 +174,44 @@ export default function AdminPage() {
           >
             {isLoading ? 'Sending...' : 'Send to All Subscribers'}
           </button>
+
+          {/* Progress Bar */}
+          {progress.total > 0 && (
+            <div className="mt-4">
+              <div className="w-full bg-zinc-800 rounded-full h-2.5">
+                <div 
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
+                  style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                ></div>
+              </div>
+              <p className="text-zinc-400 text-sm mt-2">
+                Sent {progress.current} out of {progress.total} emails
+              </p>
+            </div>
+          )}
+
+          {/* Failed Emails Section */}
+          {progress.failedEmails.length > 0 && (
+            <div className="mt-6 p-4 bg-zinc-900 rounded-lg">
+              <h3 className="text-white font-semibold mb-3">
+                Failed Emails ({progress.failedEmails.length})
+              </h3>
+              <div className="max-h-40 overflow-y-auto space-y-2">
+                {progress.failedEmails.map((fail, i) => (
+                  <div key={i} className="text-sm text-red-400">
+                    {fail.email} - {fail.error}
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={handleRetryFailed}
+                disabled={isLoading}
+                className="mt-4 bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+              >
+                Retry Failed Emails
+              </button>
+            </div>
+          )}
 
           {status && (
             <p className={`text-sm ${status.includes('Error') ? 'text-red-500' : 'text-green-500'}`}>
