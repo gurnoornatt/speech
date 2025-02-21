@@ -15,17 +15,25 @@ export async function POST(request: Request) {
   try {
     const { email } = await request.json();
 
+    console.log('Attempting to insert email:', email);
+
     // Add to Supabase with explicit schema
-    const { error: dbError } = await supabase
+    const { data, error: dbError } = await supabase
       .from('waitlist')
       .insert([{ 
         email: email.toLowerCase().trim(),
-        signed_up_at: new Date().toISOString(),
-        created_at: new Date().toISOString()
-      }]);
+        signed_up_at: new Date().toISOString()
+      }])
+      .select();
 
     if (dbError) {
-      console.error('Database error:', dbError);
+      console.error('Database error details:', {
+        code: dbError.code,
+        message: dbError.message,
+        details: dbError.details,
+        hint: dbError.hint
+      });
+      
       // Check if it's a duplicate email error
       if (dbError.code === '23505') {
         return new Response(
@@ -39,7 +47,8 @@ export async function POST(request: Request) {
       return new Response(
         JSON.stringify({ 
           error: 'Database error. Please try again.',
-          details: dbError.message
+          details: dbError.message,
+          code: dbError.code
         }),
         {
           status: 500,
@@ -91,7 +100,10 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Subscription error:', error);
     return new Response(
-      JSON.stringify({ error: 'Something went wrong. Please try again.' }),
+      JSON.stringify({ 
+        error: 'Something went wrong. Please try again.',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }),
       {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
