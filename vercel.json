@@ -6,13 +6,11 @@
   "installCommand": "npm install",
   "regions": ["sfo1"],
   "rewrites": [
-    { "source": "/", "destination": "/waitlist" }
-  ],
-  "routes": [
-    { "src": "/terms", "dest": "/terms" },
-    { "src": "/privacy", "dest": "/privacy" },
-    { "src": "/favicon.ico", "dest": "/favicon.ico" },
-    { "src": "/static/(.*)", "dest": "/static/$1" }
+    { "source": "/", "destination": "/waitlist" },
+    { "source": "/terms", "destination": "/terms" },
+    { "source": "/privacy", "destination": "/privacy" },
+    { "source": "/favicon.ico", "destination": "/favicon.ico" },
+    { "source": "/static/:path*", "destination": "/static/:path*" }
   ],
   "github": {
     "silent": false,

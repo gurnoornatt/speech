@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { motion } from 'framer-motion'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -18,16 +17,18 @@ export default function WaitlistPage() {
     setError('')
 
     try {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
+      const response = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
 
-      const { error } = await supabase
-        .from('waitlist')
-        .insert([{ email, signed_up_at: new Date() }])
+      const data = await response.json();
 
-      if (error) throw error
+      if (!response.ok) throw new Error(data.error || 'Failed to subscribe');
+
       setSuccess(true)
       setEmail('')
     } catch (err) {
@@ -91,7 +92,9 @@ export default function WaitlistPage() {
           )}
 
           {success && (
-            <p className="text-green-500 text-sm text-center">Thanks for subscribing!</p>
+            <p className="text-green-500 text-sm text-center">
+              Thanks for subscribing! Check your email for confirmation.
+            </p>
           )}
         </form>
 
