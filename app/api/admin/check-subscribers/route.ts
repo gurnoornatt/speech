@@ -7,29 +7,53 @@ const supabase = createClient(
 
 export async function GET(request: Request) {
   try {
-    // Get all tables
-    const { data: tables, error: tablesError } = await supabase
-      .from('pg_tables')
-      .select('tablename')
-      .eq('schemaname', 'public');
+    // First check if the waitlist table exists
+    const { data: tableExists, error: tableCheckError } = await supabase
+      .from('information_schema.tables')
+      .select('table_name')
+      .eq('table_schema', 'public')
+      .eq('table_name', 'waitlist')
+      .single();
 
-    if (tablesError) {
-      console.error('Error fetching tables:', tablesError);
+    if (tableCheckError) {
+      return new Response(
+        JSON.stringify({
+          error: 'Error checking table existence',
+          details: tableCheckError,
+          supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
     }
 
-    // Get waitlist data
+    // Get all public tables
+    const { data: tables, error: tablesError } = await supabase
+      .from('information_schema.tables')
+      .select('table_name')
+      .eq('table_schema', 'public');
+
+    // Try to get waitlist data with error details
     const { data: subscribers, error: subscribersError } = await supabase
       .from('waitlist')
       .select('*');
 
-    if (subscribersError) {
-      console.error('Error fetching subscribers:', subscribersError);
-    }
+    // Try to get waitlist_access data
+    const { data: accessList, error: accessError } = await supabase
+      .from('waitlist_access')
+      .select('*');
 
     return new Response(
       JSON.stringify({
+        tableExists,
         tables,
+        tablesError,
         subscribers,
+        subscribersError,
+        accessList,
+        accessError,
         supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
       }),
       {
@@ -40,7 +64,10 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Error:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to check database' }),
+      JSON.stringify({ 
+        error: 'Failed to check database',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }),
       {
         status: 500,
         headers: { 'Content-Type': 'application/json' },

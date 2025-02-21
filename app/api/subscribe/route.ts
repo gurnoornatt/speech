@@ -15,29 +15,24 @@ export async function POST(request: Request) {
   try {
     const { email } = await request.json();
 
-    // Check if email already exists
-    const { data: existingEmail } = await supabase
-      .from('waitlist')
-      .select('email')
-      .eq('email', email)
-      .single();
-
-    if (existingEmail) {
-      return new Response(
-        JSON.stringify({ error: 'This email is already on the waitlist!' }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
     // Add to Supabase
     const { error: dbError } = await supabase
       .from('waitlist')
       .insert([{ email, signed_up_at: new Date() }]);
 
-    if (dbError) throw dbError;
+    if (dbError) {
+      // Check if it's a duplicate email error
+      if (dbError.code === '23505') {
+        return new Response(
+          JSON.stringify({ error: 'This email is already on the waitlist!' }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }
+      throw dbError;
+    }
 
     // Send confirmation email
     await resend.emails.send({
@@ -82,7 +77,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Subscription error:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to process subscription' }),
+      JSON.stringify({ error: 'Something went wrong. Please try again.' }),
       {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
