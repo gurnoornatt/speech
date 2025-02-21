@@ -58,14 +58,15 @@ export async function POST(request: Request) {
 
     // Validate admin API key
     if (!validateApiKey(apiKey)) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
     }
 
-    console.log('Fetching subscribers from Supabase...');
-    
     // Get all waitlist emails
     const { data: subscribers, error: fetchError } = await supabase
       .from('waitlist')
@@ -73,17 +74,23 @@ export async function POST(request: Request) {
       .order('signed_up_at', { ascending: true });
 
     if (fetchError) {
-      console.error('Error fetching subscribers:', fetchError);
-      throw fetchError;
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to fetch subscribers',
+          details: fetchError.message
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     if (!subscribers || subscribers.length === 0) {
-      console.log('No subscribers found in the database');
       return new Response(
         JSON.stringify({ 
-          error: 'No subscribers found in the database',
-          supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-          queryResult: subscribers 
+          error: 'No subscribers found',
+          details: 'The waitlist is empty'
         }),
         {
           status: 404,
@@ -92,10 +99,8 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log(`Found ${subscribers.length} subscribers`);
-
-    // Send emails in smaller batches with longer delays
-    const batchSize = 10; // Reduced from 50 to 10
+    // Send emails in smaller batches
+    const batchSize = 10;
     const emails = subscribers.map(s => s.email);
     const batches = [];
 
@@ -103,16 +108,12 @@ export async function POST(request: Request) {
       batches.push(emails.slice(i, i + batchSize));
     }
 
-    console.log(`Sending emails in ${batches.length} batches`);
-
-    // Process each batch
     let successfulSends = 0;
     let failedEmails: { email: string; error: string }[] = [];
 
+    // Process each batch
     for (const [batchIndex, batch] of batches.entries()) {
-      console.log(`Processing batch ${batchIndex + 1}/${batches.length}`);
-      
-      // Process each email in the batch with a delay between each
+      // Process each email in the batch
       for (const email of batch) {
         try {
           await retryWithBackoff(async () => {
@@ -125,7 +126,6 @@ export async function POST(request: Request) {
           });
           
           successfulSends++;
-          console.log(`Successfully sent to ${email}`);
           
           // Wait 500ms between each email (2 emails per second as per rate limit)
           await sleep(500);
@@ -141,7 +141,6 @@ export async function POST(request: Request) {
       
       // Wait 2 seconds between batches
       if (batchIndex < batches.length - 1) {
-        console.log('Waiting between batches...');
         await sleep(2000);
       }
     }
@@ -161,11 +160,10 @@ export async function POST(request: Request) {
     );
 
   } catch (error) {
-    console.error('Mass email error:', error);
     return new Response(
       JSON.stringify({ 
         error: 'Failed to send mass email',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        details: error instanceof Error ? error.message : 'Unknown error'
       }),
       {
         status: 500,

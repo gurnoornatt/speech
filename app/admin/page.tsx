@@ -47,7 +47,9 @@ export default function AdminPage() {
 
       const data = await response.json()
 
-      if (!response.ok) throw new Error(data.error)
+      if (!response.ok) {
+        throw new Error(data.error || data.details || 'Failed to send emails')
+      }
 
       setProgress({
         current: data.emailsSent,
@@ -55,13 +57,22 @@ export default function AdminPage() {
         failedEmails: data.failedEmails || []
       })
 
-      setStatus(`Success! Sent ${data.emailsSent} out of ${data.totalSubscribers} emails.`)
+      const successRate = ((data.emailsSent / data.totalSubscribers) * 100).toFixed(1)
+      setStatus(
+        `Success! Sent ${data.emailsSent} out of ${data.totalSubscribers} emails (${successRate}% success rate).`
+      )
       
       if (data.failedEmails?.length > 0) {
-        setStatus(prev => `${prev} Failed to send to ${data.failedEmails.length} emails.`)
+        setStatus(prev => 
+          `${prev} Failed to send to ${data.failedEmails.length} emails. Click "Retry Failed Emails" to try again.`
+        )
       }
     } catch (error) {
       setStatus(`Error: ${error instanceof Error ? error.message : 'Failed to send emails'}`)
+      setProgress(prev => ({
+        ...prev,
+        failedEmails: []
+      }))
     } finally {
       setIsLoading(false)
     }
@@ -89,14 +100,26 @@ export default function AdminPage() {
 
       const data = await response.json()
 
-      if (!response.ok) throw new Error(data.error)
+      if (!response.ok) {
+        throw new Error(data.error || data.details || 'Failed to retry emails')
+      }
 
       setProgress(prev => ({
         ...prev,
+        current: prev.current + data.successfulRetries,
         failedEmails: data.remainingFailures || []
       }))
 
-      setStatus(`Retry complete! Successfully sent to ${data.successfulRetries} previously failed emails.`)
+      const successRate = ((data.successfulRetries / data.totalAttempted) * 100).toFixed(1)
+      setStatus(
+        `Retry complete! Successfully sent ${data.successfulRetries} out of ${data.totalAttempted} failed emails (${successRate}% success rate).`
+      )
+
+      if (data.remainingFailures?.length > 0) {
+        setStatus(prev => 
+          `${prev} ${data.remainingFailures.length} emails still failed.`
+        )
+      }
     } catch (error) {
       setStatus(`Retry error: ${error instanceof Error ? error.message : 'Failed to retry emails'}`)
     } finally {
@@ -178,45 +201,61 @@ export default function AdminPage() {
           {/* Progress Bar */}
           {progress.total > 0 && (
             <div className="mt-4">
-              <div className="w-full bg-zinc-800 rounded-full h-2.5">
+              <div className="w-full bg-zinc-800 rounded-full h-2.5 overflow-hidden">
                 <div 
                   className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
-                  style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                  style={{ 
+                    width: `${(progress.current / progress.total) * 100}%`,
+                    transition: 'width 0.5s ease-in-out'
+                  }}
                 ></div>
               </div>
-              <p className="text-zinc-400 text-sm mt-2">
-                Sent {progress.current} out of {progress.total} emails
-              </p>
+              <div className="flex justify-between text-zinc-400 text-sm mt-2">
+                <span>
+                  Sent {progress.current} out of {progress.total} emails
+                </span>
+                <span>
+                  {((progress.current / progress.total) * 100).toFixed(1)}%
+                </span>
+              </div>
             </div>
           )}
 
           {/* Failed Emails Section */}
           {progress.failedEmails.length > 0 && (
-            <div className="mt-6 p-4 bg-zinc-900 rounded-lg">
+            <div className="mt-6 p-4 bg-zinc-900 rounded-lg border border-red-900/50">
               <h3 className="text-white font-semibold mb-3">
                 Failed Emails ({progress.failedEmails.length})
               </h3>
-              <div className="max-h-40 overflow-y-auto space-y-2">
+              <div className="max-h-40 overflow-y-auto space-y-2 mb-4">
                 {progress.failedEmails.map((fail, i) => (
-                  <div key={i} className="text-sm text-red-400">
-                    {fail.email} - {fail.error}
+                  <div key={i} className="text-sm text-red-400 p-2 bg-red-900/20 rounded">
+                    <span className="font-medium">{fail.email}</span>
+                    <br />
+                    <span className="text-xs opacity-75">{fail.error}</span>
                   </div>
                 ))}
               </div>
               <button
                 onClick={handleRetryFailed}
                 disabled={isLoading}
-                className="mt-4 bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+                className="w-full bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg text-sm disabled:opacity-50"
               >
-                Retry Failed Emails
+                {isLoading ? 'Retrying...' : 'Retry Failed Emails'}
               </button>
             </div>
           )}
 
           {status && (
-            <p className={`text-sm ${status.includes('Error') ? 'text-red-500' : 'text-green-500'}`}>
+            <div 
+              className={`mt-4 p-4 rounded-lg ${
+                status.includes('Error') 
+                  ? 'bg-red-900/20 text-red-400' 
+                  : 'bg-green-900/20 text-green-400'
+              }`}
+            >
               {status}
-            </p>
+            </div>
           )}
         </form>
 
